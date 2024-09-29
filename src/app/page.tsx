@@ -141,6 +141,8 @@ export default function Home() {
         // Raycaster for detecting proximity to frames
         const detectFrameProximity = () => {
           raycaster.setFromCamera(new THREE.Vector2(0, 0), camera!);
+          raycaster.far = 3;  // This limits the ray to 3 units of distance
+
           const intersects = raycaster.intersectObjects(scene.children, true);
 
           let foundFrame: string | null = null;
