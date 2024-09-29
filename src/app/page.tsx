@@ -1,12 +1,15 @@
-"use client";//use this
+"use client"; // Necessary for Next.js
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, FirstPersonControls } from 'three-stdlib';
 import GUI from 'lil-gui';
 
 export default function Home() {
   const mountRef = useRef<HTMLDivElement>(null);
+
+  // State to track the active frame the user is near to
+  const [activeFrame, setActiveFrame] = useState<string | null>(null);
 
   useEffect(() => {
     const scene = new THREE.Scene();
@@ -22,7 +25,7 @@ export default function Home() {
     let galleryModel: THREE.Object3D;
     let camera: THREE.PerspectiveCamera | null = null;
 
-    //loading configuration
+    // Load GLTF model
     loader.load('/assets/threeD/test7/scene.gltf', (gltf) => {
       const model = gltf.scene;
       galleryModel = model;
@@ -53,11 +56,11 @@ export default function Home() {
         controls.verticalMax = 2.0;
 
         // Function to create frames at marker points with depth and image texture
-        const createFrameAtMarker = (marker: THREE.Object3D, imageUrl: string) => {
+        const createFrameAtMarker = (marker: THREE.Object3D, imageUrl: string, name: string) => {
           const frameDepth = 0.05; // Depth of the frame
 
           // Create a box geometry for the frame with depth
-          const frameGeometry = new THREE.BoxGeometry(2, 2, frameDepth);//2- width 2- heigth
+          const frameGeometry = new THREE.BoxGeometry(2, 2, frameDepth); // 2 - width, 2 - height
 
           // Load the image texture for the front face of the frame
           const imageTexture = textureLoader.load(imageUrl);
@@ -73,6 +76,7 @@ export default function Home() {
           ];
 
           const frameMesh = new THREE.Mesh(frameGeometry, materials);
+          frameMesh.name = name; // Assign the frame name for identification
 
           // Copy marker's position and rotation to frame
           frameMesh.position.copy(marker.position);
@@ -84,17 +88,9 @@ export default function Home() {
           // Add the frame to the scene
           scene.add(frameMesh);
         };
+
         // Array of image URLs for the frames
         const imageUrls = [
-          "/assets/images/frame1.jpg",
-          "/assets/images/frame2.jpg",
-          "/assets/images/frame3.jpg",
-          "/assets/images/frame1.jpg",
-          "/assets/images/frame2.jpg",
-          "/assets/images/frame3.jpg",
-          "/assets/images/frame1.jpg",
-          "/assets/images/frame2.jpg",
-          "/assets/images/frame3.jpg",
           "/assets/images/frame1.jpg",
           "/assets/images/frame2.jpg",
           "/assets/images/frame3.jpg",
@@ -104,29 +100,23 @@ export default function Home() {
         let frameIndex = 0;
         model.traverse((child) => {
           if (child.isObject3D && child.name.startsWith("FramePoint")) {
-            createFrameAtMarker(child, imageUrls[frameIndex % imageUrls.length]); // Add frame with image
+            createFrameAtMarker(child, imageUrls[frameIndex % imageUrls.length], child.name); // Add frame with image and name
             frameIndex++;
           }
         });
 
-
-
-
-        //GUI configuration
+        // GUI configuration
         const gui = new GUI();
         const cameraFolder = gui.addFolder('Camera');
-
-        const cameraPositionX = cameraFolder.add(camera.position, 'x', -100, 100, 0.01).name('Position X');
-        const cameraPositionY = cameraFolder.add(camera.position, 'y', -100, 100, 0.01).name('Position Y');
-        const cameraPositionZ = cameraFolder.add(camera.position, 'z', -100, 100, 0.01).name('Position Z');
-
-        const cameraRotationX = cameraFolder.add(camera.rotation, 'x', -Math.PI, Math.PI, 0.01).name('Rotation X');
-        const cameraRotationY = cameraFolder.add(camera.rotation, 'y', -Math.PI, Math.PI, 0.01).name('Rotation Y');
-        const cameraRotationZ = cameraFolder.add(camera.rotation, 'z', -Math.PI, Math.PI, 0.01).name('Rotation Z');
-
+        cameraFolder.add(camera.position, 'x', -100, 100, 0.01).name('Position X');
+        cameraFolder.add(camera.position, 'y', -100, 100, 0.01).name('Position Y');
+        cameraFolder.add(camera.position, 'z', -100, 100, 0.01).name('Position Z');
+        cameraFolder.add(camera.rotation, 'x', -Math.PI, Math.PI, 0.01).name('Rotation X');
+        cameraFolder.add(camera.rotation, 'y', -Math.PI, Math.PI, 0.01).name('Rotation Y');
+        cameraFolder.add(camera.rotation, 'z', -Math.PI, Math.PI, 0.01).name('Rotation Z');
         cameraFolder.open();
 
-        //collision check
+        // Collision check
         const raycaster = new THREE.Raycaster();
         const moveDirection = new THREE.Vector3();
 
@@ -148,23 +138,34 @@ export default function Home() {
           }
         };
 
+        // Raycaster for detecting proximity to frames
+        const detectFrameProximity = () => {
+          raycaster.setFromCamera(new THREE.Vector2(0, 0), camera!);
+          const intersects = raycaster.intersectObjects(scene.children, true);
+
+          let foundFrame: string | null = null;
+          intersects.forEach((intersect) => {
+            if (intersect.object.name.startsWith("FramePoint")) {
+              foundFrame = intersect.object.name;
+            }
+          });
+
+          // Update the active frame state
+          setActiveFrame(foundFrame);
+        };
+
+        // Animation loop
         const animate = () => {
           requestAnimationFrame(animate);
 
           controls.update(0.1);
           checkCollision();
+          detectFrameProximity(); // Check for frame proximity
 
           // Keep the camera height fixed at 1.6
           if (camera) {
             camera.position.y = 1.6;
           }
-
-          cameraPositionX.updateDisplay();
-          cameraPositionY.updateDisplay();
-          cameraPositionZ.updateDisplay();
-          cameraRotationX.updateDisplay();
-          cameraRotationY.updateDisplay();
-          cameraRotationZ.updateDisplay();
 
           renderer.render(scene, camera!);
         };
@@ -172,12 +173,12 @@ export default function Home() {
         animate();
       }
     },
-      (xhr) => {
-        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-      },
-      (error) => {
-        console.error('An error happened while loading the model', error);
-      });
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+      console.error('An error happened while loading the model', error);
+    });
 
     return () => {
       if (mountRef.current) {
@@ -188,7 +189,11 @@ export default function Home() {
 
   return (
     <div className="canvasScene">
-      <div className="testt"></div>
+      {activeFrame && (
+        <div className="absolute top-0 left-0 p-4 bg-white text-black">
+          {activeFrame}
+        </div>
+      )}
       <div ref={mountRef} className="h-[60vh] w-[80vw]" />
     </div>
   );
