@@ -18,10 +18,12 @@ export default function Home() {
     }
 
     const loader = new GLTFLoader();
+    const textureLoader = new THREE.TextureLoader(); // For loading image textures
     let galleryModel: THREE.Object3D;
     let camera: THREE.PerspectiveCamera | null = null;
 
-    loader.load('/assets/threeD/test5/scene.gltf', (gltf) => {
+    //loading configuration
+    loader.load('/assets/threeD/test7/scene.gltf', (gltf) => {
       const model = gltf.scene;
       galleryModel = model;
       scene.add(model);
@@ -50,6 +52,67 @@ export default function Home() {
         controls.verticalMin = 1.0;
         controls.verticalMax = 2.0;
 
+        // Function to create frames at marker points with depth and image texture
+        const createFrameAtMarker = (marker: THREE.Object3D, imageUrl: string) => {
+          const frameDepth = 0.05; // Depth of the frame
+
+          // Create a box geometry for the frame with depth
+          const frameGeometry = new THREE.BoxGeometry(2, 2, frameDepth);//2- width 2- heigth
+
+          // Load the image texture for the front face of the frame
+          const imageTexture = textureLoader.load(imageUrl);
+
+          // Materials for each side of the box
+          const materials = [
+            new THREE.MeshBasicMaterial({ color: 0x000000 }), // Left side
+            new THREE.MeshBasicMaterial({ color: 0x000000 }), // Right side
+            new THREE.MeshBasicMaterial({ color: 0x000000 }), // Top
+            new THREE.MeshBasicMaterial({ color: 0x000000 }), // Bottom
+            new THREE.MeshBasicMaterial({ map: imageTexture }), // Front (image texture)
+            new THREE.MeshBasicMaterial({ map: imageTexture }), // Back
+          ];
+
+          const frameMesh = new THREE.Mesh(frameGeometry, materials);
+
+          // Copy marker's position and rotation to frame
+          frameMesh.position.copy(marker.position);
+          frameMesh.rotation.copy(marker.rotation);
+
+          // Offset slightly in the Z direction to avoid z-fighting with the wall
+          frameMesh.position.z += 0.1;
+
+          // Add the frame to the scene
+          scene.add(frameMesh);
+        };
+        // Array of image URLs for the frames
+        const imageUrls = [
+          "/assets/images/frame1.jpg",
+          "/assets/images/frame2.jpg",
+          "/assets/images/frame3.jpg",
+          "/assets/images/frame1.jpg",
+          "/assets/images/frame2.jpg",
+          "/assets/images/frame3.jpg",
+          "/assets/images/frame1.jpg",
+          "/assets/images/frame2.jpg",
+          "/assets/images/frame3.jpg",
+          "/assets/images/frame1.jpg",
+          "/assets/images/frame2.jpg",
+          "/assets/images/frame3.jpg",
+        ];
+
+        // Traverse through the model and create frames where "FramePoint" markers are found
+        let frameIndex = 0;
+        model.traverse((child) => {
+          if (child.isObject3D && child.name.startsWith("FramePoint")) {
+            createFrameAtMarker(child, imageUrls[frameIndex % imageUrls.length]); // Add frame with image
+            frameIndex++;
+          }
+        });
+
+
+
+
+        //GUI configuration
         const gui = new GUI();
         const cameraFolder = gui.addFolder('Camera');
 
@@ -63,6 +126,7 @@ export default function Home() {
 
         cameraFolder.open();
 
+        //collision check
         const raycaster = new THREE.Raycaster();
         const moveDirection = new THREE.Vector3();
 
