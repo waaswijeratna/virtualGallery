@@ -93,7 +93,11 @@ export default function Home() {
         const imageUrls = [
           "/assets/images/frame1.jpg",
           "/assets/images/frame2.jpg",
-          "/assets/images/frame3.jpg",
+          "/assets/images/frame3.png",
+          "/assets/images/frame4.png",
+          "/assets/images/frame5.png",
+          "/assets/images/frame6.png",
+          "/assets/images/frame7.png",
         ];
 
         // Traverse through the model and create frames where "FramePoint" markers are found
